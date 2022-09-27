@@ -1,0 +1,82 @@
+Dataset:
+  # Preprocess data
+  name: "google-speech-command-v2"
+  root_dir: "F:/Datasets/speech_commands_v0.02"
+  add_noise: True
+  background_noise_path: '_background_noise_'
+  labels: ['visual', 'wow', 'learn', 'backward', 'dog', 'two', 'left', 'happy', 'nine', 'go', 'up', 'bed', 'stop', 'one', 'zero', 'tree', 'seven', 'on', 'four', 'bird', 'right', 'eight', 'no', 'six', 'forward', 'house', 'marvin', 'sheila', 'five', 'off', 'three', 'down', 'cat', 'follow', 'yes']
+
+AudioProcessing:
+  # Init
+  sample_rate: 16000
+  augment: True
+
+  Augmentor:
+    prob: 0.8
+    min_shift: -100. # ms
+    max_shift: 100. # ms
+    noise_prob: 0.8
+
+
+  ToMelSpectrogram:
+    window_size: 0.025
+    window_stride: 0.01
+    window: "hann"
+    n_mel: &n_mel 32
+    n_fft: 512
+
+  ToMFCC:
+    window_size: 0.025
+    window_stride: 0.01
+    window: "hann"
+    n_mel: *n_mel
+    n_mfcc: *n_mel
+    n_fft: 512
+
+Parameters:
+  num_workers: 2
+  max_epochs: 50
+  embedding_size: 512
+  n_labels: 35
+  device: 'cpu' #[cpu, cuda]
+  batch_size: 128
+  Loss_fn:
+    Triplet:
+      selector: 'hardest' # ['hardest', 'semi_hard', 'random', 'all']
+      margin: 0.5
+      classes_per_batch: 35
+      samples_per_class: 5
+
+    SoftTriplet:
+      margin: 0.01
+      lambda: 20
+      gamma: 0.1
+      tau: 0.
+      centers_per_class: 5
+
+    Triplet_Entropy:
+      alpha: 0.5
+      beta: 0.5
+      selector: 'hardest'
+      margin: 1.
+      classes_per_batch: 35
+      samples_per_class: 5
+  Optimizer:
+    name: "sgd"
+    lr: 0.001
+    weight_decay: 0.001
+
+  Scheduler:
+    name: "plateau" # ["plateau", "step", "cosine"]
+    step_size: 50 # {Step: 50, Plateau: 5}
+    patience: 5
+    gamma: 0.1
+    T_max: 50
+
+
+
+Checkpoint:
+  # Checkpoint
+  path: "./checkpoints"
+  name : ""
+  resume: False
