@@ -51,7 +51,7 @@ def fit(model,
     for epoch in range(start_epoch, max_epochs):
         print("Epoch ", epoch)
         global text_epoch
-        text_epoch = "Epoch %s\n" % epoch
+        text_epoch = "Epoch %s" % epoch
         train_loss, metrics = do_train(model, train_loader, optimizer, loss_fn, metrics, use_gpu)
         valid_loss, metrics = do_validation(model, val_loader, loss_fn, metrics, use_gpu)
         if scheduler_name == "plateau":
@@ -85,11 +85,12 @@ def fit(model,
                                                                          time_elapsed % 3600 // 60,
                                                                          time_elapsed % 60)
         text_epoch += "\n%s, Best loss %f, Best accuracy %.02f%%" % (time_str, best_loss, best_acc)
+        print("%s, Best loss %f, Best accuracy %.02f%%" % (time_str, best_loss, best_acc))
         if logger is not None:
             logger.info(text_epoch)
 
     if logger is not None:
-        logger.infor('Finished ...')
+        logger.info('Finished ...')
 
 
 def do_train(model,
@@ -130,9 +131,9 @@ def do_train(model,
             ordered_dict[metric.name()] = metric.value()
 
         pbar.set_postfix(ordered_dict)
-    text_epoch += "Train loss: " + str(np.mean(losses))
+    text_epoch += "\nTrain loss: " + str(np.mean(losses)) + " "
     for metric in metrics:
-        text_epoch += metric.name() + ': ' + str(metric.value())
+        text_epoch += metric.name() + ': ' + str(metric.value()) + " "
     # logger.info(text)
     return np.mean(losses), metrics
 
@@ -172,9 +173,9 @@ def do_validation(model,
                 ordered_dict[metric.name()] = metric.value()
 
             pbar.set_postfix(ordered_dict)
-        text_epoch += "Valid loss: " + str(np.mean(losses))
+        text_epoch += "\nValid loss: " + str(np.mean(losses)) + " "
         for metric in metrics:
-            text_epoch += metric.name() + ': ' + str(metric.value())
+            text_epoch += metric.name() + ': ' + str(metric.value()) + " "
         return np.mean(losses), metrics
 
 

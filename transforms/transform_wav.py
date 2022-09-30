@@ -85,7 +85,8 @@ class ShiftAudio(object):
         if np.random.rand() > self.prob:
             return data
         sample_rate = data['sample_rate']
-        shift_range = int(np.random.uniform(self.min_shift * sample_rate / 1000, self.max_shift * sample_rate / 1000))
+        shift_range = int(
+            np.random.uniform(round(self.min_shift * sample_rate / 1000), round(self.max_shift * sample_rate / 1000)))
         # print(shift_range)
         data['samples'] = np.roll(data['samples'], shift_range)
         return data
@@ -132,8 +133,8 @@ class ToMelSpectrogram(object):
                                            sr=sample_rate,
                                            n_mels=self.n_mels,
                                            window=self.window,
-                                           win_length=int(self.window_size * sample_rate),
-                                           hop_length=int(self.window_stride * sample_rate),
+                                           win_length=int(round(self.window_size * sample_rate)),
+                                           hop_length=int(round(self.window_stride * sample_rate)),
                                            n_fft=self.n_fft)
         data['mel_spectrogram'] = librosa.power_to_db(s, ref=np.max)
         return data
@@ -159,8 +160,8 @@ class ToMFCC(object):
                                             sr=sample_rate,
                                             n_mfcc=self.n_mfcc,
                                             window=self.window,
-                                            win_length=int(self.window_size * sample_rate),
-                                            hop_length=int(self.window_stride * sample_rate),
+                                            win_length=int(round(self.window_size * sample_rate)),
+                                            hop_length=int(round(self.window_stride * sample_rate)),
                                             n_fft=self.n_fft)
         data['mfcc_feature'] = mfcc_feature
         return data

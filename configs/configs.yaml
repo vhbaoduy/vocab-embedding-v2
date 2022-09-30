@@ -63,8 +63,8 @@ Parameters:
       samples_per_class: 5
   Optimizer:
     name: "sgd"
-    lr: 0.001
-    weight_decay: 0.001
+    lr: 0.1
+    weight_decay: 0.000001
 
   Scheduler:
     name: "plateau" # ["plateau", "step", "cosine"]

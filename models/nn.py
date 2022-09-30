@@ -26,7 +26,7 @@ class Networks(nn.Module):
                 n_feats = self.base.get_last_dimension()
                 self.batch_norm = nn.BatchNorm1d(n_feats)
                 self.batch_norm.bias.requires_grad = False
-                self.classifier = ngn.Linear(n_feats,
+                self.classifier = nn.Linear(n_feats,
                                             n_class,
                                             bias=False)
             else:

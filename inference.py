@@ -1,5 +1,7 @@
 import argparse
 
+import pandas as pd
+
 from transforms import *
 from torch.utils.data import DataLoader
 from metrics import *
@@ -13,14 +15,15 @@ import numpy as np
 def do_inference(model,
                  data_loader,
                  metric,
-                 save_feature,
+                 save_hit,
                  path,
                  labels,
                  mode,
                  use_gpu):
     with torch.no_grad():
         metric.reset()
-        features = {}
+        hits = {}
+        counter = {}
         model.eval()
         pbar = tqdm(data_loader, desc='Test: ')
         for batch in pbar:
@@ -38,51 +41,55 @@ def do_inference(model,
             pbar.set_postfix(ordered_dict)
 
             if preds is not None:
-                prediction = preds.data.max(1, keepdim=True)[1]
-                prediction = prediction.cpu().numpy().ravel()
+                prediction = preds.data.max(1, keepdim=True)
+                prediction = prediction[0].cpu().numpy().ravel()
+                probs = prediction[1].cpuu().numpy().ravel()
 
             # Convert gpu to cpu
             # preds = preds.cpu().numpy().ravel()
             targets = targets.cpu().numpy().ravel()
-            feat = feat.cpu().numpy()
+            if feat is not None:
+                feat = feat.cpu().numpy()
 
-            if save_feature:
+            if save_hit:
                 cur_batch_size = len(batch['path'])
                 for i in range(cur_batch_size):
-                    file_name = batch['path'][i]
-                    if preds is not None:
-                        name_class = utils.index_to_label(labels, prediction[i])
+                    # file_name = batch['path'][i]
+                    name_class = utils.index_to_label(labels, prediction[i])
                     truth_class = utils.index_to_label(labels, targets[i])
-                    if mode == 'truth' or mode == 'intersect':
-                        folder = os.path.join(path, truth_class)
-                    elif model == 'predict':
-                        folder = os.path.join(path, name_class)
+                    # folder = os.path.join(path, truth_class)
+                    #
+                    # if not os.path.exists(folder):
+                    #     os.mkdir(folder)
+                    # audio_name = file_name.split('/')[1].split('.')[0]
 
-                    if not os.path.exists(folder):
-                        os.mkdir(folder)
-                    audio_name = file_name.split('/')[1].split('.')[0]
-
-                    if mode == 'intersect':
-                        if name_class == truth_class:
-                            np.save(os.path.join(folder, truth_class + "_" + audio_name + ".npy"), feat[i])
-                    else:
-                        np.save(os.path.join(folder, truth_class + "_" + audio_name + ".npy"), feat[i])
-
-                    if mode == 'truth':
-                        key = truth_class
-                    elif mode == 'predict':
-                        key = name_class
+                    if truth_class in hits:
+                        if truth_class == name_class:
+                            hits[truth_class].append(probs[i])
+                            counter[truth_class] += 1
+                        else:
+                            hits[truth_class].append(0)
                     else:
                         if truth_class == name_class:
-                            key = truth_class
+                            hits[truth_class] = [probs[i]]
+                            counter[truth_class] = 1
                         else:
-                            continue
+                            hits[truth_class] = [0]
 
-                    if key in features:
-                        features[key].append(feat[i])
-                    else:
-                        features[key] = [feat[i]]
-        return metric
+        data = {
+             'vocab': [],
+             'prob_accumulation': [],
+             'hit' : []
+        }
+        for key in hits:
+            total = sum(hits[key])
+            cnt = counter[key]
+            data['vocab'].append(key)
+            data['prob_accumulation'].append(total)
+            data['hit'].append(cnt)
+        df = pd.DataFrame(data)
+        df.to_csv(os.path.join(path, 'result.csv'), index=False)
+        return hits, counter
 
 
 if __name__ == '__main__':
@@ -100,7 +107,7 @@ if __name__ == '__main__':
     parser.add_argument('-path_to_df', type=str, help='path to dataframe')
     parser.add_argument('-batch_size', type=int, default=128,
                         help="batch size for inference")
-    parser.add_argument('-save_feature', type=bool, required=True,
+    parser.add_argument('-save_hit', type=bool, required=True,
                         help="optional")
     parser.add_argument('-path', type=str, default='./inferences',
                         help="path to store features")
@@ -117,7 +124,7 @@ if __name__ == '__main__':
     embedding_size = args.embedding_size
     feature = args.feature
     model_path = args.model_path
-    save_feature = args.save_feature
+    save_hit = args.save_hit
     path = args.path
     batch_size = args.batch_size
     path_to_df = args.path_to_df
@@ -153,10 +160,8 @@ if __name__ == '__main__':
                                  num_workers=param_cfgs['num_workers'],
                                  pin_memory=use_gpu)
 
-    model = Networks(model_name=model_name,
-                     n_dim=embedding_size,
-                     n_class=len(labels),
-                     classify=classify)
+    model = ResnetModel(model_name=model_name,
+                        n_labels=len(labels))
 
     # model = torch.load(model_path, map_location=torch.device('cpu'))
     model.load(model_path)
@@ -170,7 +175,7 @@ if __name__ == '__main__':
     do_inference(model=model,
                  data_loader=test_dataloader,
                  metric=metric_learning,
-                 save_feature=save_feature,
+                 save_hit=save_hit,
                  path=path,
                  labels=labels,
                  mode=mode,

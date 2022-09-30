@@ -12,8 +12,8 @@ import yaml
 import logging
 
 
-def make_logger(checkpoint_path):
-    logging.basicConfig(filename=checkpoint_path + '/train_logs.txt',
+def make_logger(checkpoint_path, filename):
+    logging.basicConfig(filename=checkpoint_path + '/' + filename,
                         filemode='a',
                         format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                         datefmt='%H:%M:%S',
@@ -65,6 +65,14 @@ def get_optimizer(opt_cfgs, model):
     return optimizer
 
 
+def set_seed(seed, use_gpu):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if use_gpu:
+        torch.cuda.manual_seed(seed)
+    random.seed(seed)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train model for speech command',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -76,11 +84,8 @@ if __name__ == '__main__':
     parser.add_argument('-feature', type=str, default='mel_spectrogram',
                         choices=['mfcc', 'mel_spectrogram'],
                         help="type of feature input")
-    parser.add_argument('-triplet_selector', type=str, default='hardest',
-                        choices=['hardest', 'random_hard', 'semi_hard', 'all'],
-                        help="type of triplet selector")
     parser.add_argument('-loss', type=str,
-                        choices=['triplet', 'soft_triplet', 'triplet_entropy'])
+                        choices=['triplet', 'soft_triplet', 'triplet_entropy', 'cross_entropy'])
     parser.add_argument('-classify', type=bool, default=False,
                         help='optional for classify')
     parser.add_argument('-df_train', type=str, required=True,
@@ -92,13 +97,12 @@ if __name__ == '__main__':
                         help='method for balance data')
 
     args = parser.parse_args()
-    np.random.seed(46)
+    # np.random.seed(46)
 
     # Parse arguments
     config_file = args.config_file
     model_name = args.model_name
     feature = args.feature
-    triplet_selector = args.triplet_selector
     loss = args.loss
     classify = args.classify
     df_train = args.df_train
@@ -170,10 +174,12 @@ if __name__ == '__main__':
             valid_sampler = PKSampler(valid_dataset.get_labels('normal'), n_classes, n_samples)
             # Data loader
             train_dataloader = DataLoader(train_dataset,
+                                          batch_size=batch_size,
                                           sampler=train_sampler,
                                           num_workers=param_cfgs['num_workers'],
                                           pin_memory=use_gpu)
             valid_dataloader = DataLoader(valid_dataset,
+                                          batch_size=batch_size,
                                           sampler=valid_sampler,
                                           num_workers=param_cfgs['num_workers'],
                                           pin_memory=use_gpu)
@@ -181,6 +187,7 @@ if __name__ == '__main__':
         train_dataloader = DataLoader(train_dataset,
                                       batch_size=param_cfgs['batch_size'],
                                       shuffle=True,
+                                      drop_last=True,
                                       num_workers=param_cfgs['num_workers'],
                                       pin_memory=use_gpu)
         valid_dataloader = DataLoader(valid_dataset,
@@ -190,10 +197,8 @@ if __name__ == '__main__':
                                       pin_memory=use_gpu)
 
     # Create model
-    model = Networks(model_name=model_name,
-                     n_dim=param_cfgs['embedding_size'],
-                     n_class=param_cfgs['n_labels'],
-                     classify=classify)
+    model = ResnetModel(model_name=model_name,
+                        n_labels=param_cfgs['n_labels'])
 
     # Get optimizer, scheduler, loss function
     optimizer = get_optimizer(param_cfgs['Optimizer'], model)
@@ -202,26 +207,26 @@ if __name__ == '__main__':
                            name=loss)
 
     checkpoint_path = None
-    logger = make_logger(checkpoint_cfgs['path'])
-
     if checkpoint_cfgs['resume']:
         print("Resuming a checkpoint '%s'" % checkpoint_cfgs['name'])
-        logger.info("Resuming a checkpoint '%s'" % checkpoint_cfgs['name'])
+        # logger.info("Resuming a checkpoint '%s'" % checkpoint_cfgs['name'])
         checkpoint_path = os.path.join(checkpoint_cfgs['path'], checkpoint_cfgs['name'])
 
         # Create checkpoint path
     if not os.path.exists(checkpoint_cfgs['path']):
         os.mkdir(checkpoint_cfgs['path'])
-
+    logger = make_logger(checkpoint_cfgs['path'], 'log.txt')
     logger.info('Save the config ...')
     with open(checkpoint_cfgs['path'] + '/config.yaml', 'w') as outfile:
         yaml.dump(configs, outfile, default_flow_style=False)
 
     if loss == 'triplet_entropy':
         metric_learnings = [AccumulatedAccuracyMetric(), AverageNonzeroTripletsMetric()]
+    elif loss == 'cross_entropy':
+        metric_learnings = [AccumulatedAccuracyMetric()]
     else:
         metric_learnings = [AverageNonzeroTripletsMetric()]
-
+    set_seed(46, use_gpu)
     fit(
         model=model,
         train_loader=train_dataloader,

@@ -37,7 +37,7 @@ def make_loss_fn(param_config,
                 return alpha * loss_A + beta * loss_B, n_triplets
 
     elif name == 'soft_triplet':
-        config = loss_fn_config['Soft_Triplet']
+        config = loss_fn_config['SoftTriplet']
         soft_triplet_loss = SoftTripleLoss(param_config['n_labels'],
                                            param_config['embedding_size'],
                                            config['centers_per_class'],
@@ -49,6 +49,10 @@ def make_loss_fn(param_config,
 
         def loss_fn(scores, embeddings, target):
             return soft_triplet_loss(embeddings, target)
+    elif name == 'cross_entropy':
+        def loss_fn(scores, embeddings, target):
+            loss = nn.CrossEntropyLoss()
+            return loss(scores, target)
     else:
 
         raise ValueError('Not found loss function')

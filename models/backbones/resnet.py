@@ -29,11 +29,11 @@ resnet_configs = {
 
 
 class SpeechResModel(SerializableModule):
-    def __init__(self, config):
+    def __init__(self, config, n_labels):
         super().__init__()
-        # n_labels = configs["n_labels"]
+        # n_labels = config["n_labels"]
         n_maps = config["n_feature_maps"]
-        self.last_dimension = n_maps
+        # self.last_dimension = n_maps
         self.conv0 = nn.Conv2d(1, n_maps, (3, 3), padding=(1, 1), bias=False)
         if "res_pool" in config:
             self.pool = nn.AvgPool2d(config["res_pool"])
@@ -49,7 +49,7 @@ class SpeechResModel(SerializableModule):
         for i, conv in enumerate(self.convs):
             self.add_module("bn{}".format(i + 1), nn.BatchNorm2d(n_maps, affine=False))
             self.add_module("conv{}".format(i + 1), conv)
-        # self.output = nn.Linear(n_maps, n_labels)
+        self.output = nn.Linear(n_maps, n_labels)
 
     def forward(self, x):
         x = x.unsqueeze(1)
@@ -68,4 +68,4 @@ class SpeechResModel(SerializableModule):
                 x = getattr(self, "bn{}".format(i))(x)
         x = x.view(x.size(0), x.size(1), -1)  # shape: (batch, feats, o3)
         x = torch.mean(x, 2)
-        return x
+        return self.output(x)
