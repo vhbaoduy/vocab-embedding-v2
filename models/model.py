@@ -7,14 +7,17 @@ class ResnetModel(nn.Module):
     def __init__(self,
                  model_name: str,
                  n_labels: int,
+                 mode='train'
                  ):
         super(ResnetModel, self).__init__()
         self.base = get_model(model_name, n_labels)
+        self.mode = mode
         self.soft_max = nn.Softmax(dim=-1)
 
     def forward(self, x: torch.Tensor):
         x = self.base(x)
-        x = self.soft_max(x)
+        if self.mode != 'train':
+            x = self.soft_max(x)
         return x, None
 
     def save(self, filename):

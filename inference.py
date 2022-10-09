@@ -77,9 +77,10 @@ def do_inference(model,
                             hits[truth_class] = [0]
 
         data = {
-             'vocab': [],
-             'prob_accumulation': [],
-             'hit' : []
+            'vocab': [],
+            'prob_accumulation': [],
+            'hit': [],
+            'total': []
         }
         for key in hits:
             total = sum(hits[key])
@@ -87,6 +88,7 @@ def do_inference(model,
             data['vocab'].append(key)
             data['prob_accumulation'].append(total)
             data['hit'].append(cnt)
+            data['total'].append(len(hits[key]))
         df = pd.DataFrame(data)
         df.to_csv(os.path.join(path, 'result.csv'), index=False)
         return hits, counter
