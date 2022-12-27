@@ -21,11 +21,13 @@ def fit(model,
         metrics,
         logger=None,
         use_gpu=True,
+        device='cpu',
         start_epoch=0,
         checkpoint_path=None,
         save_path=None):
     if use_gpu:
-        model = torch.nn.DataParallel(model).cuda()
+        # model = torch.nn.DataParallel(model).cuda()
+        model = model.to(device)
 
     if logger is not None:
         logger.info("Start Training ...")
@@ -52,8 +54,8 @@ def fit(model,
         print("Epoch ", epoch)
         global text_epoch
         text_epoch = "Epoch %s" % epoch
-        train_loss, metrics = do_train(model, train_loader, optimizer, loss_fn, metrics, use_gpu)
-        valid_loss, metrics = do_validation(model, val_loader, loss_fn, metrics, use_gpu)
+        train_loss, metrics = do_train(model, train_loader, optimizer, loss_fn, metrics, use_gpu,device=device)
+        valid_loss, metrics = do_validation(model, val_loader, loss_fn, metrics, use_gpu,device=device)
         if scheduler_name == "plateau":
             scheduler.step(metrics=valid_loss)
 
@@ -98,7 +100,8 @@ def do_train(model,
              optimizer,
              loss_fn,
              metrics,
-             use_gpu=False):
+             use_gpu=False,
+             device='cpu'):
     for metric in metrics:
         metric.reset()
     global text_epoch
@@ -111,8 +114,8 @@ def do_train(model,
         targets = batch['target']
 
         if use_gpu:
-            inputs = inputs.to('cuda')
-            targets = targets.to('cuda')
+            inputs = inputs.to(device)
+            targets = targets.to(device)
 
         optimizer.zero_grad()
         preds, feat = model(inputs)
@@ -142,7 +145,8 @@ def do_validation(model,
                   val_loader,
                   loss_fn,
                   metrics,
-                  use_gpu):
+                  use_gpu,
+                  device='cpu'):
     with torch.no_grad():
         for metric in metrics:
             metric.reset()
@@ -156,8 +160,8 @@ def do_validation(model,
             targets = batch['target']
 
             if use_gpu:
-                inputs = inputs.to('cuda')
-                targets = targets.to('cuda')
+                inputs = inputs.to(device)
+                targets = targets.to(device)
 
             preds, feat = model(inputs)
             loss = loss_fn(preds, feat, targets)

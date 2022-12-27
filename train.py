@@ -17,7 +17,7 @@ def make_logger(checkpoint_path, filename):
                         filemode='a',
                         format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                         datefmt='%H:%M:%S',
-                        level=logging.DEBUG)
+                        level=logging.INFO)
 
     return logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('-feature', type=str, default='mel_spectrogram',
                         choices=['mfcc', 'mel_spectrogram'],
                         help="type of feature input")
-    parser.add_argument('-loss', type=str,
+    parser.add_argument('-loss', type=str,default='cross_entropy',
                         choices=['triplet', 'soft_triplet', 'triplet_entropy', 'cross_entropy'])
     parser.add_argument('-classify', type=bool, default=False,
                         help='optional for classify')
@@ -115,6 +115,7 @@ if __name__ == '__main__':
     audio_cfgs = configs['AudioProcessing']
     param_cfgs = configs['Parameters']
     checkpoint_cfgs = configs['Checkpoint']
+    device = param_cfgs['device']
 
     use_gpu = torch.cuda.is_available()
     print('use_gpu', use_gpu)
@@ -123,7 +124,7 @@ if __name__ == '__main__':
 
     background_noise_path = None
     if dataset_cfgs['add_noise']:
-        background_noise_path = os.path.join(dataset_cfgs['root_dir'], dataset_cfgs['background_noise_path'])
+        background_noise_path = dataset_cfgs['background_noise_path']
 
     # Build transform
     train_transform = build_transform(audio_cfgs,
@@ -240,5 +241,6 @@ if __name__ == '__main__':
         checkpoint_path=checkpoint_path,
         save_path=checkpoint_cfgs['path'],
         use_gpu=use_gpu,
+        device=device,
         logger=logger
     )

@@ -1,11 +1,10 @@
 Dataset:
   # Preprocess data
-  name: "google-speech-command-v2"
-  root_dir: "F:/Datasets/speech_commands_v0.02"
+  name: "audio_mnist"
+  root_dir: "data/audio_mnist"
   add_noise: True
-  background_noise_path: '_background_noise_'
-  labels: ['visual', 'wow', 'learn', 'backward', 'dog', 'two', 'left', 'happy', 'nine', 'go', 'up', 'bed', 'stop', 'one', 'zero', 'tree', 'seven', 'on', 'four', 'bird', 'right', 'eight', 'no', 'six', 'forward', 'house', 'marvin', 'sheila', 'five', 'off', 'three', 'down', 'cat', 'follow', 'yes']
-
+  background_noise_path: 'data/speech_commands_v0.02/_background_noise_'
+  labels: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 AudioProcessing:
   # Init
   sample_rate: 16000
@@ -22,7 +21,7 @@ AudioProcessing:
     window_size: 0.025
     window_stride: 0.01
     window: "hann"
-    n_mel: &n_mel 32
+    n_mel: &n_mel 64
     n_fft: 512
 
   ToMFCC:
@@ -35,11 +34,11 @@ AudioProcessing:
 
 Parameters:
   num_workers: 2
-  max_epochs: 50
+  max_epochs: 35
   embedding_size: 512
-  n_labels: 35
-  device: 'cpu' #[cpu, cuda]
-  batch_size: 128
+  n_labels: 10
+  device: 'cuda:0' #[cpu, cuda]
+  batch_size: 64
   Loss_fn:
     Triplet:
       selector: 'hardest' # ['hardest', 'semi_hard', 'random', 'all']
@@ -68,7 +67,7 @@ Parameters:
 
   Scheduler:
     name: "plateau" # ["plateau", "step", "cosine"]
-    step_size: 50 # {Step: 50, Plateau: 5}
+    step_size: 5 # {Step: 50, Plateau: 5}
     patience: 5
     gamma: 0.1
     T_max: 50
@@ -77,6 +76,6 @@ Parameters:
 
 Checkpoint:
   # Checkpoint
-  path: "./checkpoints"
+  path: "./checkpoints/male/exp3"
   name : ""
   resume: False

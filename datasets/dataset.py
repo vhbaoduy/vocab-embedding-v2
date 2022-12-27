@@ -26,14 +26,14 @@ class SpeechCommandsDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        path = os.path.join(self.root_dir, row['file_name'])
-        label = utils.label_to_index(self.labels, row['vocab'])
+        path = os.path.join(self.root_dir, row['file'])
+        label = utils.label_to_index(self.labels, str(row['word']))
         samples, sample_rate = utils.load_audio(path, self.sample_rate)
         data = {
             'samples': samples,
             'sample_rate': sample_rate,
             'target': label,
-            'path': row['file_name']
+            'path': row['file']
         }
         if self.transform is not None:
             data = self.transform(data)
@@ -43,7 +43,7 @@ class SpeechCommandsDataset(Dataset):
         labels = []
         for i in range(len(self.df)):
             row = self.df.iloc[i]
-            labels.append(utils.label_to_index(self.labels, row['vocab']))
+            labels.append(utils.label_to_index(self.labels, row['word']))
         if type_return == 'tensor':
             return torch.LongTensor(labels)
         else:

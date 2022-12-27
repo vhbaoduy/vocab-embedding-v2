@@ -52,7 +52,7 @@ def make_loss_fn(param_config,
     elif name == 'cross_entropy':
         def loss_fn(scores, embeddings, target):
             loss = nn.CrossEntropyLoss()
-            return loss(scores, target)
+            return loss(scores, target), 0
     else:
 
         raise ValueError('Not found loss function')

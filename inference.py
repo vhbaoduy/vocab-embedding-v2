@@ -15,14 +15,12 @@ import numpy as np
 def do_inference(model,
                  data_loader,
                  metric,
-                 save_hit,
                  path,
                  labels,
-                 mode,
-                 use_gpu):
+                 use_gpu,
+                 device):
     with torch.no_grad():
         metric.reset()
-        hits = {}
         counter = {}
         model.eval()
         pbar = tqdm(data_loader, desc='Test: ')
@@ -31,8 +29,8 @@ def do_inference(model,
             targets = batch['target']
 
             if use_gpu:
-                inputs = inputs.to('cuda')
-                targets = targets.to('cuda')
+                inputs = inputs.to(device)
+                targets = targets.to(device)
 
             preds, feat = model(inputs)
             metric(preds, targets, None)
@@ -41,9 +39,7 @@ def do_inference(model,
             pbar.set_postfix(ordered_dict)
 
             if preds is not None:
-                prediction = preds.data.max(1, keepdim=True)
-                prediction = prediction[0].cpu().numpy().ravel()
-                probs = prediction[1].cpuu().numpy().ravel()
+                prediction = preds.data.max(1, keepdim=True)[0].cpu().numpy().ravel()
 
             # Convert gpu to cpu
             # preds = preds.cpu().numpy().ravel()
@@ -55,50 +51,41 @@ def do_inference(model,
                 cur_batch_size = len(batch['path'])
                 for i in range(cur_batch_size):
                     # file_name = batch['path'][i]
-                    name_class = utils.index_to_label(labels, prediction[i])
-                    truth_class = utils.index_to_label(labels, targets[i])
-                    # folder = os.path.join(path, truth_class)
-                    #
-                    # if not os.path.exists(folder):
-                    #     os.mkdir(folder)
-                    # audio_name = file_name.split('/')[1].split('.')[0]
+                    name_class = utils.index_to_label(labels, str(prediction[i]))
+                    truth_class = utils.index_to_label(labels, str(targets[i]))
 
-                    if truth_class in hits:
-                        if truth_class == name_class:
-                            hits[truth_class].append(probs[i])
-                            counter[truth_class] += 1
-                        else:
-                            hits[truth_class].append(0)
+                    if name_class not in counter:
+                        counter[name_class]['true'] = 0
+                        counter[name_class]['false'] = 0
+                    
+                    if name_class == truth_class:
+                        counter[name_class]['true'] += 1
                     else:
-                        if truth_class == name_class:
-                            hits[truth_class] = [probs[i]]
-                            counter[truth_class] = 1
-                        else:
-                            hits[truth_class] = [0]
+                        counter[name_class]['false'] += 1
 
         data = {
-            'vocab': [],
-            'prob_accumulation': [],
-            'hit': [],
-            'total': []
+            'word': [],
+            'true': [],
+            'false': [],
+            'accuracy': []
         }
-        for key in hits:
-            total = sum(hits[key])
-            cnt = counter[key]
-            data['vocab'].append(key)
-            data['prob_accumulation'].append(total)
-            data['hit'].append(cnt)
-            data['total'].append(len(hits[key]))
+        for key in counter:
+            data['word'].append(key)
+            t = counter[key]['true']
+            f = counter[key]['false']
+            data['true'].append(t)
+            data['f'].append(f)
+            data['accuracy'].append(t / (t+f))
         df = pd.DataFrame(data)
-        df.to_csv(os.path.join(path, 'result.csv'), index=False)
-        return hits, counter
+        df.to_csv(path, index=False)
+        return data
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train model for speech command',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-config_file', default='configs.yaml', type=str, help='name of config file')
-    parser.add_argument('-model_name', default='resnet15', type=str,
+    parser.add_argument('-model_name', default='res15', type=str,
                         choices=['res8', 'res15', 'res26', 'res8-narrow', 'res15-narrow', 'res26-narrow'],
                         help='model name as backbone')
     parser.add_argument('-model_path', type=str, help='path to model')
@@ -109,8 +96,6 @@ if __name__ == '__main__':
     parser.add_argument('-path_to_df', type=str, help='path to dataframe')
     parser.add_argument('-batch_size', type=int, default=128,
                         help="batch size for inference")
-    parser.add_argument('-save_hit', type=bool, required=True,
-                        help="optional")
     parser.add_argument('-path', type=str, default='./inferences',
                         help="path to store features")
     parser.add_argument('-mode', type=str,
@@ -126,7 +111,6 @@ if __name__ == '__main__':
     embedding_size = args.embedding_size
     feature = args.feature
     model_path = args.model_path
-    save_hit = args.save_hit
     path = args.path
     batch_size = args.batch_size
     path_to_df = args.path_to_df
@@ -139,6 +123,7 @@ if __name__ == '__main__':
     audio_cfgs = configs['AudioProcessing']
     param_cfgs = configs['Parameters']
     checkpoint_cfgs = configs['Checkpoint']
+    device = param_cfgs['device']
 
     use_gpu = torch.cuda.is_available()
     print('use_gpu', use_gpu)
@@ -147,12 +132,11 @@ if __name__ == '__main__':
 
     labels = dataset_cfgs['labels']
     # Load dataframe
-    df_test = pd.read_csv(path_to_df)
     test_transform = build_transform(audio_cfgs,
                                      mode='valid',
                                      feature_name=feature)
     test_dataset = SpeechCommandsDataset(dataset_cfgs['root_dir'],
-                                         df_test,
+                                         path_to_df,
                                          audio_cfgs['sample_rate'],
                                          labels=dataset_cfgs['labels'],
                                          transform=test_transform)
@@ -165,10 +149,11 @@ if __name__ == '__main__':
     model = ResnetModel(model_name=model_name,
                         n_labels=len(labels))
 
-    # model = torch.load(model_path, map_location=torch.device('cpu'))
-    model.load(model_path)
+    model = torch.load(model_path, map_location=torch.device(device))
+    # model.load(model_path)
     if use_gpu:
-        model = nn.DataParallel(model).cuda()
+        # model = nn.DataParallel(model).cuda()
+        model = model.to(device)
 
     metric_learning = AccumulatedAccuracyMetric()
     if not os.path.exists(path):
@@ -177,8 +162,7 @@ if __name__ == '__main__':
     do_inference(model=model,
                  data_loader=test_dataloader,
                  metric=metric_learning,
-                 save_hit=save_hit,
                  path=path,
                  labels=labels,
-                 mode=mode,
-                 use_gpu=use_gpu)
+                 use_gpu=use_gpu,
+                 device=device)
